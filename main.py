@@ -62,5 +62,8 @@ async def create_issue(issue: CreateIssue):
         raise HTTPException(status_code=response.status_code, detail="Error creating GitHub issue")
 
 @app.get("/issues")
-def get_issues():
-    return {"Hello": "World"}
+def get_issues(issue):
+    state: str = Query(default="open"),
+    labels: str | None = Query(default=None),
+    page: int | None = Query(default=None),
+    per_page: int = Query(default=30, le=100)
