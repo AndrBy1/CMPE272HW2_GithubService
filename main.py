@@ -6,7 +6,6 @@ from pydantic import BaseModel
 import httpx
 from enum import Enum
 
-
 load_dotenv()
 
 app = FastAPI()
@@ -32,6 +31,17 @@ class IssueState(str, Enum):
     closed = "closed"
     all = "all"
 
+def json_content(responseJson):
+    return {
+        "number": responseJson['number'], 
+        "html_url": responseJson['html_url'],
+        "state": responseJson['state'],
+        "title": responseJson['title'], 
+        "body": responseJson.get('body', None), 
+        "labels": responseJson.get('labels', []), 
+        "created_at": responseJson['created_at'], 
+        "updated_at": responseJson['updated_at']
+    }
 
 @app.post("/issues")
 async def create_issue(issue: CreateIssue):
@@ -54,16 +64,7 @@ async def create_issue(issue: CreateIssue):
         print(f"Created GitHub issue #{github_issue['number']}: {github_issue['title']}")
         return JSONResponse(
             status_code=201,
-            content={
-                "number": github_issue['number'], 
-                "html_url": github_issue['html_url'],
-                "state": github_issue['state'],
-                "title": github_issue['title'], 
-                "body": github_issue.get('body', ''), 
-                "labels": github_issue.get('labels', []), 
-                "created_at": github_issue['created_at'], 
-                "updated_at": github_issue['updated_at']
-            },
+            content=json_content(github_issue),
             headers={"Location": f"/issues/{github_issue['number']}"}
         )
     elif response.status_code == 401:
@@ -97,7 +98,7 @@ async def get_issues(
         issues = response.json()
         return JSONResponse(
             status_code=200,
-            content=issues,
+            content=[json_content(issue) for issue in issues],
             headers={"Link": link_header} if link_header else {}
         )
     elif response.status_code == 401:
@@ -116,7 +117,7 @@ async def get_issue(issue_number: int):
         issue = response.json()
         return JSONResponse(
             status_code=200,
-            content=issue
+            content=json_content(issue)
         )
     elif response.status_code == 404:
         raise HTTPException(status_code=404, detail="Issue not found")
@@ -152,7 +153,7 @@ async def update_issue(issue_number: int, edit_issue: UpdateIssue):
         updated_issue = response.json()
         return JSONResponse(
             status_code=200,
-            content=updated_issue
+            content=json_content(updated_issue)
         )
     elif response.status_code == 404:
         raise HTTPException(status_code=404, detail="Issue not found")
