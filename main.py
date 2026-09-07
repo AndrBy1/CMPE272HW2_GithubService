@@ -32,6 +32,7 @@ class IssueState(str, Enum):
     closed = "closed"
     all = "all"
 
+
 @app.post("/issues")
 async def create_issue(issue: CreateIssue):
     data = {
@@ -104,3 +105,56 @@ async def get_issues(
     else:
         raise HTTPException(status_code=response.status_code, detail="Error fetching GitHub issues")
 
+@app.get("/issues/{issue_number}")
+async def get_issue(issue_number: int):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f"{github_url}/{issue_number}",
+            headers=Headers
+        )
+    if response.status_code == 200:
+        issue = response.json()
+        return JSONResponse(
+            status_code=200,
+            content=issue
+        )
+    elif response.status_code == 404:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    else:
+        raise HTTPException(status_code=response.status_code, detail="Error fetching GitHub issue")
+
+class UpdateIssue(BaseModel):
+    title: str | None = None
+    body: str | None = None
+    state: str | None = None
+
+@app.patch("/issues/{issue_number}")
+async def update_issue(issue_number: int, edit_issue: UpdateIssue):
+    if not edit_issue:
+        raise HTTPException(status_code=400,detail="At least one field must be provided")
+    if edit_issue.state is not None and edit_issue.state not in ["open", "closed"]:
+        raise HTTPException(status_code=400, detail="Invalid state value. Must be 'open' or 'closed'.")
+    data = {}
+    if edit_issue.title is not None:
+        data["title"] = edit_issue.title
+    if edit_issue.body is not None:
+        data["body"] = edit_issue.body
+    if edit_issue.state is not None:
+        data["state"] = edit_issue.state
+
+    async with httpx.AsyncClient() as client:
+        response = await client.patch(
+            f"{github_url}/{issue_number}",
+            headers=Headers,
+            json=data
+        )
+    if response.status_code == 200:
+        updated_issue = response.json()
+        return JSONResponse(
+            status_code=200,
+            content=updated_issue
+        )
+    elif response.status_code == 404:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    else:
+        raise HTTPException(status_code=response.status_code, detail="Error updating GitHub issue")
